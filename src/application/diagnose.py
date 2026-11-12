@@ -3,9 +3,7 @@ from uuid import UUID
 from src.domain.execution import Execution
 
 
-def begin_diagnosis(
-    order_id: UUID, saga_id: UUID, correlation_id: UUID
-) -> Execution:
+def begin_diagnosis(order_id: UUID, saga_id: UUID, correlation_id: UUID) -> Execution:
     execution = Execution(
         order_id=order_id,
         saga_id=saga_id,

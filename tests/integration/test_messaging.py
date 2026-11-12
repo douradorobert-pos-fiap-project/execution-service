@@ -23,9 +23,7 @@ TABLE_NAME = "execution-messaging-test"
 
 @pytest.fixture
 def infrastructure():
-    with mock_aws(
-        config={"core": {"service_whitelist": ["dynamodb", "sqs"]}}
-    ):
+    with mock_aws(config={"core": {"service_whitelist": ["dynamodb", "sqs"]}}):
         dynamodb = boto3.client(
             "dynamodb",
             region_name="us-east-1",
@@ -149,6 +147,9 @@ def test_consumer_keeps_handler_failure_for_retry(infrastructure):
     sqs.send(queue_url, item)
     consumer = SQSConsumer(sqs, queue_url)
 
-    assert consumer.poll_once(lambda message: (_ for _ in ()).throw(
-        RuntimeError("out of order")
-    )) == "failed"
+    assert (
+        consumer.poll_once(
+            lambda message: (_ for _ in ()).throw(RuntimeError("out of order"))
+        )
+        == "failed"
+    )

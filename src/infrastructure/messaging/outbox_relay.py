@@ -23,7 +23,7 @@ class DynamoDBOutboxStore:
         self._serialize = TypeSerializer().serialize
         self._deserialize = TypeDeserializer().deserialize
 
-    def claim_batch(self, limit: int, lease_seconds: int) -> list[Any]:
+    def claim_batch(self, limit: int, lease_seconds: int) -> list[OutboxRecord]:
         now = datetime.now(UTC)
         raw_items = self._client.scan(
             TableName=self._table_name,
@@ -33,13 +33,11 @@ class DynamoDBOutboxStore:
                 ":false": self._serialize(False),
             },
         ).get("Items", [])
-        records = []
+        records: list[OutboxRecord] = []
         for raw in raw_items:
             if len(records) >= limit:
                 break
-            item = {
-                key: self._deserialize(value) for key, value in raw.items()
-            }
+            item = {key: self._deserialize(value) for key, value in raw.items()}
             next_attempt = item.get("next_attempt_at")
             if next_attempt and next_attempt > now.isoformat():
                 continue
@@ -111,12 +109,11 @@ class DynamoDBOutboxStore:
         if isinstance(value, Decimal):
             return int(value) if value == value.to_integral() else str(value)
         if isinstance(value, dict):
-            return {
-                key: cls._json_compatible(item) for key, item in value.items()
-            }
+            return {key: cls._json_compatible(item) for key, item in value.items()}
         if isinstance(value, list):
             return [cls._json_compatible(item) for item in value]
         return value
+
 
 class OutboxRelay:
     def __init__(
@@ -138,9 +135,7 @@ class OutboxRelay:
             try:
                 self._sqs.send(self._queue_url, record.payload)
             except Exception:  # noqa: BLE001 - every publisher failure is retryable
-                delay = min(
-                    self._base_retry_seconds * (2**record.attempts), 300
-                )
+                delay = min(self._base_retry_seconds * (2**record.attempts), 300)
                 self._store.mark_failed(record, delay)
                 continue
             self._store.mark_published(record)

@@ -116,9 +116,7 @@ def complete_diagnosis(
     event_id: EventIdHeader,
 ) -> dict[str, Any]:
     execution = load(request, execution_id)
-    finish_diagnosis(
-        execution, data.diagnosis, data.recommended_service_ids
-    )
+    finish_diagnosis(execution, data.diagnosis, data.recommended_service_ids)
     persist(request, execution, event_id, "DiagnosisCompletedV1")
     return response(execution)
 

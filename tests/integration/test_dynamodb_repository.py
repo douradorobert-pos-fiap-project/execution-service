@@ -69,9 +69,7 @@ def decoded_items(dynamodb) -> list[dict]:
     ]
 
 
-def test_save_atomically_persists_execution_inbox_and_outbox(
-    repository, dynamodb
-):
+def test_save_atomically_persists_execution_inbox_and_outbox(repository, dynamodb):
     aggregate = execution()
     incoming_event_id = uuid4()
     aggregate.start_diagnosis()

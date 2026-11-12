@@ -32,8 +32,14 @@ def test_valid_envelope_round_trips_as_json() -> None:
 @pytest.mark.parametrize(
     "required_field",
     [
-        "event_id", "event_type", "occurred_at", "correlation_id",
-        "causation_id", "saga_id", "order_id", "payload",
+        "event_id",
+        "event_type",
+        "occurred_at",
+        "correlation_id",
+        "causation_id",
+        "saga_id",
+        "order_id",
+        "payload",
     ],
 )
 def test_envelope_rejects_a_missing_required_field(required_field: str) -> None:

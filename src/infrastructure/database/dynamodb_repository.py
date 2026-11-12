@@ -134,16 +134,12 @@ class DynamoDBExecutionRepository:
             TableName=self._table_name,
             IndexName="QueueIndex",
             KeyConditionExpression="GSI1PK = :queue",
-            ExpressionAttributeValues={
-                ":queue": self._serialize("STATUS#QUEUED")
-            },
+            ExpressionAttributeValues={":queue": self._serialize("STATUS#QUEUED")},
             ScanIndexForward=True,
         )
         return [self._to_execution(item) for item in response["Items"]]
 
-    def _execution_item(
-        self, execution: Execution, version: int
-    ) -> dict[str, Any]:
+    def _execution_item(self, execution: Execution, version: int) -> dict[str, Any]:
         item: dict[str, Any] = {
             "PK": f"EXECUTION#{execution.id}",
             "SK": "STATE",
@@ -164,16 +160,16 @@ class DynamoDBExecutionRepository:
             "failure_reason": execution.failure_reason,
             "queued_at": execution.queued_at,
         }
-        item.update({key: value for key, value in optional.items() if value is not None})
+        item.update(
+            {key: value for key, value in optional.items() if value is not None}
+        )
         if execution.status is ExecutionStatus.QUEUED:
             item["GSI1PK"] = "STATUS#QUEUED"
             item["GSI1SK"] = execution.queued_at
         return item
 
     def _to_execution(self, raw_item: dict[str, Any]) -> Execution:
-        item = {
-            key: self._deserialize(value) for key, value in raw_item.items()
-        }
+        item = {key: self._deserialize(value) for key, value in raw_item.items()}
         return Execution(
             id=UUID(item["id"]),
             order_id=UUID(item["order_id"]),
