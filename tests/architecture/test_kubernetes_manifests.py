@@ -12,6 +12,7 @@ EXPECTED_FILES = {
     "configmap.yaml",
     "hpa.yaml",
     "secret.example.yaml",
+    "ingress.yaml",
 }
 
 
@@ -61,6 +62,35 @@ def test_service_hpa_and_configuration_are_service_scoped():
     assert hpa["spec"]["maxReplicas"] >= hpa["spec"]["minReplicas"]
     assert not any(
         "SECRET" in key or "TOKEN" in key or "PASSWORD" in key for key in config["data"]
+    )
+
+
+def test_ingress_routes_execution_paths_through_shared_internal_alb():
+    ingress = documents("ingress.yaml")[0]
+    assert ingress["kind"] == "Ingress"
+    assert (
+        ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/group.name"]
+        == "sandbox-api"
+    )
+    assert (
+        ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/scheme"]
+        == "internal"
+    )
+    assert (
+        ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/security-groups"]
+        == "${ALB_SECURITY_GROUP_ID}"
+    )
+    rules = ingress["spec"]["rules"]
+    paths = {
+        path["path"]: path["backend"]["service"]["name"]
+        for rule in rules
+        for path in rule["http"]["paths"]
+    }
+    assert paths == {
+        "/api/v1/executions": SERVICE,
+    }
+    assert all(
+        path["pathType"] == "Prefix" for rule in rules for path in rule["http"]["paths"]
     )
 
 

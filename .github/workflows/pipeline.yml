@@ -73,6 +73,7 @@ jobs:
     environment: sandbox
     env:
       DYNAMODB_TABLE: ${{ vars.DYNAMODB_TABLE }}
+      ALB_SECURITY_GROUP_ID: ${{ vars.ALB_SECURITY_GROUP_ID }}
       K8S_DEPLOYMENT: ${{ vars.K8S_DEPLOYMENT }}
       NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     steps:
@@ -83,6 +84,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: Validate internal ALB configuration
+        run: test -n "$ALB_SECURITY_GROUP_ID"
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
       - name: Validate managed data resources
@@ -101,5 +104,6 @@ jobs:
         run: |
           sed "s|image: .*tech-challenge-fiap-execution-service.*|image: $IMAGE|" k8s/deployment.yaml | kubectl apply -f -
           kubectl apply -f k8s/hpa.yaml
+          sed "s|\${ALB_SECURITY_GROUP_ID}|$ALB_SECURITY_GROUP_ID|" k8s/ingress.yaml | kubectl apply -f -
           kubectl -n oficina rollout status "deployment/$K8S_DEPLOYMENT" --timeout=180s
 
