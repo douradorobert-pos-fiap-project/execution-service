@@ -16,6 +16,11 @@ def test_workflow_builds_prs_and_deploys_only_by_manual_dispatch() -> None:
     assert "github.event_name == 'workflow_dispatch'" in workflow
     assert "environment: sandbox" in workflow
     assert "imageDigest" in workflow
+    assert "ALB_SECURITY_GROUP_ID: ${{ vars.ALB_SECURITY_GROUP_ID }}" in workflow
+    assert workflow.index("Validate internal ALB configuration") < workflow.index(
+        "k8s/deployment.yaml"
+    )
+    assert "k8s/ingress.yaml" in workflow
 
 
 def test_manual_deploy_requires_and_validates_execution_resources() -> None:
