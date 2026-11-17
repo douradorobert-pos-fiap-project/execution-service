@@ -63,6 +63,7 @@ def test_sqs_client_reads_elasticmq_endpoint_from_environment(monkeypatch):
     client = SQSClient.from_env()
 
     assert client.endpoint_url == "http://elasticmq:9324"
+    assert client._client.meta.config.read_timeout > 10
 
 
 def outbox_item(dynamodb) -> dict:
