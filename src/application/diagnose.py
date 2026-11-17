@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from src.domain.execution import Execution
+from src.domain.execution import Execution, execution_id_for_order
 
 
 def begin_diagnosis(order_id: UUID, saga_id: UUID, correlation_id: UUID) -> Execution:
@@ -8,6 +8,7 @@ def begin_diagnosis(order_id: UUID, saga_id: UUID, correlation_id: UUID) -> Exec
         order_id=order_id,
         saga_id=saga_id,
         correlation_id=correlation_id,
+        id=execution_id_for_order(order_id),
     )
     execution.start_diagnosis()
     return execution

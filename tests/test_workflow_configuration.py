@@ -26,6 +26,8 @@ def test_manual_deploy_requires_and_validates_execution_resources() -> None:
     assert "aws sqs get-queue-url" in workflow
     assert "sandbox-execution-service-events" in workflow
     assert 'DYNAMODB_TABLE: \\"$DYNAMODB_TABLE\\"' in workflow
+    assert "k8s/worker-deployment.yaml" in workflow
+    assert "rollout status deployment/execution-service-worker" in workflow
 
 
 def test_secret_sync_refreshes_aws_and_new_relic_without_echoing_values(

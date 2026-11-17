@@ -1,7 +1,11 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
+
+
+def execution_id_for_order(order_id: UUID) -> UUID:
+    return uuid5(NAMESPACE_URL, f"service-order-execution:{order_id}")
 
 
 class ExecutionStatus(StrEnum):

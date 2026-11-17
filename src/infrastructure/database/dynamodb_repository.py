@@ -5,7 +5,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import ClientError
 
-from src.domain.execution import Execution, ExecutionStatus
+from src.domain.execution import Execution, ExecutionStatus, execution_id_for_order
 
 
 class DuplicateEvent(RuntimeError):
@@ -31,6 +31,22 @@ class DynamoDBExecutionRepository:
         )
         item = response.get("Item")
         return self._to_execution(item) if item else None
+
+    def get_by_order(self, order_id: UUID) -> Execution | None:
+        return self.get(execution_id_for_order(order_id))
+
+    def was_processed(self, event_id: UUID, consumer: str) -> bool:
+        response = self._client.get_item(
+            TableName=self._table_name,
+            Key=self._item(
+                {
+                    "PK": f"INBOX#{event_id}",
+                    "SK": f"CONSUMER#{consumer}",
+                }
+            ),
+            ConsistentRead=True,
+        )
+        return bool(response.get("Item"))
 
     def save_with_event(
         self,
@@ -67,6 +83,17 @@ class DynamoDBExecutionRepository:
             "consumer": consumer,
             "processed_at": now,
         }
+        payload: dict[str, Any] = {
+            "execution_id": str(execution.id),
+            "status": execution.status.value,
+        }
+        if outgoing_event_type == "DiagnosisCompletedV1":
+            payload["diagnosis"] = execution.diagnosis
+            payload["recommended_service_ids"] = [
+                str(service_id) for service_id in execution.recommended_service_ids
+            ]
+        if outgoing_event_type == "ExecutionFailedV1":
+            payload["failure_reason"] = execution.failure_reason
         outbox_item = {
             "PK": f"OUTBOX#{event_id}",
             "SK": "EVENT",
@@ -85,10 +112,7 @@ class DynamoDBExecutionRepository:
                 "causation_id": str(causation_id),
                 "saga_id": str(execution.saga_id),
                 "order_id": str(execution.order_id),
-                "payload": {
-                    "execution_id": str(execution.id),
-                    "status": execution.status.value,
-                },
+                "payload": payload,
             },
         }
         state_put: dict[str, Any] = {

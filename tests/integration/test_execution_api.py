@@ -114,6 +114,14 @@ def test_operational_api_runs_diagnosis_queue_and_repair(api):
         "ExecutionStartedV1",
         "ExecutionCompletedV1",
     }
+    diagnosis_event = next(
+        item
+        for item in dynamodb.scan(TableName=TABLE_NAME)["Items"]
+        if item.get("event_type", {}).get("S") == "DiagnosisCompletedV1"
+    )
+    assert diagnosis_event["envelope"]["M"]["payload"]["M"]["recommended_service_ids"][
+        "L"
+    ][0]["S"] == str(SERVICE_ID)
 
 
 def test_api_rejects_compensation_after_repair_starts(api):

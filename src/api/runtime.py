@@ -8,6 +8,16 @@ from src.infrastructure.database.dynamodb_repository import DynamoDBExecutionRep
 
 
 def create_runtime_app():
+    return create_app(create_repository())
+
+
+def create_repository() -> DynamoDBExecutionRepository:
+    return DynamoDBExecutionRepository(
+        create_dynamodb_client(), os.getenv("DYNAMODB_TABLE", "execution-service")
+    )
+
+
+def create_dynamodb_client() -> Any:
     endpoint_url = os.getenv("DYNAMODB_ENDPOINT_URL") or None
     options: dict[str, Any] = {
         "region_name": os.getenv("AWS_REGION", "us-east-1"),
@@ -19,7 +29,4 @@ def create_runtime_app():
             aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY", "local"),
         )
     client = boto3.client("dynamodb", **options)
-    repository = DynamoDBExecutionRepository(
-        client, os.getenv("DYNAMODB_TABLE", "execution-service")
-    )
-    return create_app(repository)
+    return client
