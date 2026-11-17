@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import boto3
@@ -6,12 +7,13 @@ from boto3.dynamodb.types import TypeDeserializer
 from botocore.exceptions import EndpointConnectionError
 from moto import mock_aws
 
-from src.domain.execution import Execution
+from src.domain.execution import Execution, ExecutionStatus, execution_id_for_order
 from src.infrastructure.database.bootstrap import create_execution_table
 from src.infrastructure.database.dynamodb_repository import (
     DynamoDBExecutionRepository,
 )
 from src.infrastructure.messaging.consumer import SQSConsumer
+from src.infrastructure.messaging.handler import process_event
 from src.infrastructure.messaging.outbox_relay import (
     DynamoDBOutboxStore,
     OutboxRelay,
@@ -153,3 +155,71 @@ def test_consumer_keeps_handler_failure_for_retry(infrastructure):
         )
         == "failed"
     )
+
+
+def test_worker_starts_diagnosis_and_queues_execution_idempotently(infrastructure):
+    dynamodb, _, _ = infrastructure
+    repository = DynamoDBExecutionRepository(dynamodb, TABLE_NAME)
+    order_id = uuid4()
+    saga_id = uuid4()
+    correlation_id = uuid4()
+    diagnosis_command = {
+        "event_id": str(uuid4()),
+        "event_type": "DiagnosisRequestedV1",
+        "event_version": 1,
+        "occurred_at": datetime.now(UTC).isoformat(),
+        "correlation_id": str(correlation_id),
+        "causation_id": str(uuid4()),
+        "saga_id": str(saga_id),
+        "order_id": str(order_id),
+        "payload": {},
+    }
+
+    assert process_event(repository, diagnosis_command) is True
+    assert process_event(repository, diagnosis_command) is False
+    current = repository.get_by_order(order_id)
+    assert current.id == execution_id_for_order(order_id)
+    assert current.status is ExecutionStatus.DIAGNOSING
+
+    current.complete_diagnosis("Brake service", [uuid4()])
+    repository.save_with_event(
+        current,
+        incoming_event_id=uuid4(),
+        consumer="execution-api",
+        outgoing_event_type="DiagnosisCompletedV1",
+        causation_id=uuid4(),
+    )
+    execution_command = {
+        **diagnosis_command,
+        "event_id": str(uuid4()),
+        "event_type": "ExecutionRequestedV1",
+    }
+
+    assert process_event(repository, execution_command) is True
+    assert process_event(repository, execution_command) is False
+    assert repository.get_by_order(order_id).status is ExecutionStatus.QUEUED
+
+
+def test_relay_routes_execution_events_to_the_os_queue(infrastructure):
+    dynamodb, raw_sqs, execution_url = infrastructure
+    os_url = raw_sqs.create_queue(QueueName="os-service-events")["QueueUrl"]
+    aggregate = execution()
+    repository = DynamoDBExecutionRepository(dynamodb, TABLE_NAME)
+    repository.save_with_event(
+        aggregate,
+        incoming_event_id=uuid4(),
+        consumer="execution-test",
+        outgoing_event_type="DiagnosisStartedV1",
+        causation_id=uuid4(),
+    )
+    relay = OutboxRelay(
+        DynamoDBOutboxStore(dynamodb, TABLE_NAME),
+        SQSClient(raw_sqs),
+        {"DiagnosisStartedV1": os_url},
+    )
+
+    assert relay.run_once() == 1
+    assert SQSClient(raw_sqs).receive(os_url)[0].body["event_type"] == (
+        "DiagnosisStartedV1"
+    )
+    assert SQSClient(raw_sqs).receive(execution_url) == []

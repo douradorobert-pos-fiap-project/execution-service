@@ -13,6 +13,7 @@ from src.application.execute_repair import (
 )
 from src.domain.execution import (
     Execution,
+    ExecutionStatus,
     IrreversibleRepairError,
 )
 from src.infrastructure.database.dynamodb_repository import (
@@ -103,6 +104,15 @@ def start_diagnosis(
     event_id: EventIdHeader,
     correlation_id: Annotated[UUID, Header(alias="X-Correlation-ID")],
 ) -> dict[str, Any]:
+    existing = repository(request).get_by_order(data.order_id)
+    if existing is not None:
+        if (
+            existing.saga_id != data.saga_id
+            or existing.correlation_id != correlation_id
+            or existing.status is not ExecutionStatus.DIAGNOSING
+        ):
+            raise HTTPException(status_code=409, detail="execution already exists")
+        return response(existing)
     execution = begin_diagnosis(data.order_id, data.saga_id, correlation_id)
     persist(request, execution, event_id, "DiagnosisStartedV1")
     return response(execution)
@@ -134,6 +144,14 @@ def enqueue(
 @router.get("/queue")
 def queue(request: Request) -> list[dict[str, Any]]:
     return [response(item) for item in repository(request).list_queue()]
+
+
+@router.get("/by-order/{order_id}")
+def detail_by_order(order_id: UUID, request: Request) -> dict[str, Any]:
+    execution = repository(request).get_by_order(order_id)
+    if execution is None:
+        raise HTTPException(status_code=404, detail="execution not found")
+    return response(execution)
 
 
 @router.post("/{execution_id}/repair/start")
