@@ -13,6 +13,10 @@ bash scripts/quality.sh
 
 A aplicação é criada com repository DynamoDB pela factory/runtime. Swagger: `http://localhost:8003/docs`; OpenAPI: `/openapi.json`; health: `/health`. As rotas `/api/v1/executions` exigem `X-Event-ID` nos comandos e propagam `X-Correlation-ID`.
 
+## Evidências de qualidade
+
+Execução `workflow_dispatch` concluída com sucesso em 17/11/2026: [run 44119569387](https://github.com/douradorobert-pos-fiap-project/execution-service/actions/runs/44119569387). O workflow reportou 56 testes aprovados e 86,96% de cobertura. O artifact `quality-reports-execution-service` inclui `coverage.xml` e JUnit.
+
 Use DynamoDB Local no desenvolvimento/CI e `k8s/secret.example.yaml` somente como modelo. Pull requests executam qualidade e build Docker local, sem publicar ou acessar a AWS. O workflow publica a imagem por SHA e resolve seu digest, valida DynamoDB e SQS, atualiza configuração e Secret e faz o rollout somente quando iniciado manualmente por `workflow_dispatch` no environment `sandbox`.
 
 ## Configuração do sandbox
